@@ -1,4 +1,4 @@
-name: fastserve
+name: fastllm
 channels:
   - pytorch
   - nvidia/label/cuda-11.8.0

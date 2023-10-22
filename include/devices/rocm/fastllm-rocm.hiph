@@ -1,0 +1,77 @@
+
+#include <hip/hip_runtime.h>
+#include "fastllm.h"
+
+#ifdef  __cplusplus
+extern "C" {
+#endif
+void FastllmInitCublas(void);
+
+void FastllmRocmMallocBigBuffer(size_t size);
+void FastllmRocmClearBigBuffer();
+void *FastllmRocmMalloc(size_t size);
+void FastllmRocmFree(void *ret);
+void * FastllmRocmDirectMalloc(size_t size);
+void FastllmRocmDirectFree(void *ret);
+
+void FastllmRocmCopyFromHostToDevice(void *dst, void *src, size_t size);
+void FastllmRocmCopyFromDeviceToHost(void *dst, void *src, size_t size);
+void FastllmRocmCopyFromDeviceToDevice(void *dst, void *src, size_t size);
+
+void FastllmRocmMemcpy2DDeviceToDevice(void * 	dst, size_t 	dpitch, const void * 	src,
+                                       size_t 	spitch, size_t 	width, size_t 	height);
+void FastllmRocmMemcpy2DDeviceToDeviceBatch(void ** 	dsts, size_t *	dpitchs, void ** 	srcs,
+                                       size_t *	spitchs, size_t *widths, size_t *	heights,
+                                       int batch);
+bool FastllmRocmAttention(const fastllm::Data &q, const fastllm::Data &k, const fastllm::Data &v,
+                          const fastllm::Data &mask, const fastllm::Data &output, int group, float scale);
+bool FastllmRocmGeluNew(const fastllm::Data &input, fastllm::Data &output);
+bool FastllmRocmSilu(const fastllm::Data &input, fastllm::Data &output);
+bool FastllmRocmSwiglu(const fastllm::Data &input, fastllm::Data &output);
+bool FastllmRocmMul(const fastllm::Data &input, float v, fastllm::Data &output);
+bool FastllmRocmSoftmax(const fastllm::Data &input, fastllm::Data &output, int axis);
+bool FastllmRocmAddTo(fastllm::Data &input0, const fastllm::Data &input1, float alpha);
+bool FastllmRocmMulTo(fastllm::Data &input0, const fastllm::Data &input1, float alpha);
+bool FastllmRocmAttentionMask(fastllm::Data &input, const fastllm::Data &mask, float maskValue);
+bool FastllmRocmAlibiMask(fastllm::Data &input, const fastllm::Data &mask, float maskValue);
+bool FastllmRocmRMSNorm(const fastllm::Data &input, fastllm::Data &weight, fastllm::Data &output, float eps);
+bool FastllmRocmLayerNorm(const fastllm::Data &input, fastllm::Data &gamma, fastllm::Data &beta, fastllm::Data &output, int axis);
+bool FastllmRocmTopK(const fastllm::Data &input, fastllm::Data &output, int topk);
+bool FastllmRocmPermute(fastllm::Data &input, const std::vector<int> &axis);
+bool FastllmRocmMatMulFloatInt8(const fastllm::Data &input, fastllm::Data &weight, const fastllm::Data &bias, fastllm::Data &output, int n, int m, int k);
+bool FastllmRocmMatMulFloatInt4(const fastllm::Data &input, fastllm::Data &weight, const fastllm::Data &bias, fastllm::Data &output, int n, int m, int k);
+bool FastllmRocmMatMulFloatInt4NoZero(const fastllm::Data &input, fastllm::Data &weight, const fastllm::Data &bias, fastllm::Data &output, int n, int m, int k);
+bool FastllmRocmMatMulFloat32(const fastllm::Data &input, fastllm::Data &weight, const fastllm::Data &bias, fastllm::Data &output, int n, int m, int k);
+bool FastllmRocmMatMulFloat16(const fastllm::Data &input, fastllm::Data &weight, const fastllm::Data &bias, fastllm::Data &output, int n, int m, int k);
+bool FastllmRocmBatchMatMul(const fastllm::Data &input0, const fastllm::Data &input1, fastllm::Data &output,
+                                  int input0Spatial, int input1Spatial, int outputSpatial,
+                                  int input0Stride, int input1Stride,
+                                  int batch, int n, int m, int k, float alpha);
+bool FastllmRocmBatchMatMulTransB(const fastllm::Data &input0, const fastllm::Data &input1, fastllm::Data &output,
+                              int input0Spatial, int input1Spatial, int outputSpatial,
+                              int input0Stride, int input1Stride,
+                              int batch, int n, int m, int k, float alpha);
+bool FastllmRocmRotatePosition2D(fastllm::Data &data, const fastllm::Data &positionIds,
+                                 const fastllm::Data &sinData, const fastllm::Data &cosData, int rotaryDim);
+bool FastllmRocmNearlyRotatePosition2D(fastllm::Data &data, const fastllm::Data &positionIds,
+                                 const fastllm::Data &sinData, const fastllm::Data &cosData, int rotaryDim);
+bool FastllmRocmLlamaRotatePosition2D(fastllm::Data &data, const fastllm::Data &positionIds,
+                                 const fastllm::Data &sinData, const fastllm::Data &cosData, int rotaryDim);
+bool FastllmRocmApplyLognAttn (fastllm::Data &input, fastllm::Data &lognAttn, fastllm::Data &positionIds);
+
+bool FastllmRocmAttentionBatch(fastllm::Data **q, fastllm::Data **k, fastllm::Data **v,
+                          fastllm::Data **mask, fastllm::Data **output, int group, float scale, int batch);
+bool FastllmRocmSplitBatch(fastllm::Data &input, fastllm::Data **outputs, int axis);
+bool FastllmRocmCatBatch(fastllm::Data **inputs, fastllm::Data &output, int axis);
+bool FastllmRocmMulBatch(fastllm::Data **inputs, float v, int batch, fastllm::Data **outputs);
+bool FastllmRocmSoftmaxBatch(fastllm::Data **inputs, fastllm::Data **outputs, int axis, int batch);
+bool FastllmRocmBatchMatMulTransBBatch(void **i0s, void **i1s, void **os,
+                                      int *ns, int *ms, int *ks,
+                                      int *i0Strides, int *i1Strides, float alpha, int batch);
+bool FastllmRocmBatchMatMulBatch(void **i0s, void **i1s, void **os,
+                                       int *ns, int *ms, int *ks,
+                                       int *i0Strides, int *i1Strides, float alpha, int batch);
+void FastllmRocmSetDevice(int gpu_id);
+#ifdef  __cplusplus
+}
+#endif

@@ -8,9 +8,9 @@ option(PY_API "python api" OFF)
 option(USE_MMAP "use mmap" OFF)
 
 option(USE_SENTENCEPIECE "use sentencepiece" OFF)
+option(CMAKE_CUDA_ARCHITECTURES "The CUDA arch: native or number" "native")
 
 message(STATUS "USE_CUDA: ${USE_CUDA}")
-
 message(STATUS "PYTHON_API: ${PY_API}")
 
 message(STATUS "USE_SENTENCEPIECE: ${USE_SENTENCEPIECE}")
@@ -52,7 +52,6 @@ if (USE_CUDA)
     #message(${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES})
     set(FASTLLM_CUDA_SOURCES src/devices/cuda/cudadevice.cpp src/devices/cuda/cudadevicebatch.cpp src/devices/cuda/fastllm-cuda.cu)
     set(FASTLLM_LINKED_LIBS ${FASTLLM_LINKED_LIBS} cublas)
-    set(CMAKE_CUDA_ARCHITECTURES "native")
   link_directories($ENV{CONDA_PREFIX}/lib)
   include_directories($ENV{CONDA_PREFIX}/include)
   set(CMAKE_PREFIX_PATH $ENV{CONDA_PREFIX} ${CMAKE_PREFIX_PATH})
@@ -62,12 +61,15 @@ if (USE_CUDA)
 endif()
 
 if (USE_ROCM)
-    // TODO
-    enable_language(CUDA)
-    add_compile_definitions(USE_CUDA)
-    include_directories(include/devices/cuda)
+    enable_language(HIP)
+    find_package(rocprim REQUIRED CONFIG PATHS "/opt/rocm/rocprim")
+    include_directories(${rocprim_INCLUDE_DIRS})
+    
+    # TODO
+    # add_compile_definitions(USE_CUDA)
+    include_directories(include/devices/rocm)
     #message(${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES})
-    set(FASTLLM_CUDA_SOURCES src/devices/cuda/cudadevice.cpp src/devices/cuda/cudadevicebatch.cpp src/devices/cuda/fastllm-cuda.cu)
+    set(FASTLLM_CUDA_SOURCES src/devices/rocm/rocmdevice.cpp src/devices/rocm/rocmdevicebatch.cpp src/devices/rocm/fastllm-rocm.hip)
     set(FASTLLM_LINKED_LIBS ${FASTLLM_LINKED_LIBS} cublas)
     set(CMAKE_CUDA_ARCHITECTURES "native")
   link_directories($ENV{CONDA_PREFIX}/lib)
