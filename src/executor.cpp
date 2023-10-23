@@ -21,6 +21,8 @@ namespace fastllm {
         this->devices.clear();
 #ifdef USE_CUDA
         this->devices.push_back((BaseDevice*) new CudaDevice());
+#elifdef USE_ROCM
+        this->devices.push_back((BaseDevice*) new RocmDevice());
 #endif
         this->devices.push_back((BaseDevice*) new CpuDevice());
     }
@@ -87,6 +89,11 @@ namespace fastllm {
                 if (device->deviceType == "cuda" && device->deviceIds.size() > 0) {
                     FastllmCudaSetDevice(device->deviceIds[0]);
                 }
+#elifdef USE_ROCM
+                if (device->deviceType == "rocm" && device->deviceIds.size() > 0) {
+                    FastllmRocmSetDevice(device->deviceIds[0]);
+                }
+
 #endif
                 for (auto &it: datas) {
                     if (intParams.find(it.first + "___batch") != intParams.end()) {

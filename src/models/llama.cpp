@@ -157,6 +157,8 @@ namespace fastllm {
             int unitLen = 64;
 #ifdef USE_CUDA
             unitLen = 128;
+#elifdef USE_ROCM
+            unitLen = 128;
 #endif
             while ((pastKey.dims.size() == 0 && (pastKey.expansionDims.size() == 0 || k.dims[1] > pastKey.expansionDims[1]))
                    || (pastKey.dims.size() > 0 && pastKey.dims[1] + k.dims[1] > pastKey.expansionDims[1])) {
@@ -318,6 +320,8 @@ namespace fastllm {
 
             int unitLen = 64;
 #ifdef USE_CUDA
+            unitLen = 128;
+#elifdef USE_ROCM
             unitLen = 128;
 #endif
             while ((pastKey.dims.size() == 0 && (pastKey.expansionDims.size() == 0 || k.dims[1] > pastKey.expansionDims[1]))
@@ -505,6 +509,8 @@ namespace fastllm {
                 int unitLen = 64;
 #ifdef USE_CUDA
                 unitLen = 128;
+#elifdef USE_ROCM
+                unitLen = 128;
 #endif
                 while ((pastKey.dims.size() == 0 &&
                         (pastKey.expansionDims.size() == 0 || k.dims[1] > pastKey.expansionDims[1]))
@@ -599,6 +605,8 @@ namespace fastllm {
                                      const GenerationConfig &generationConfig) {
 #ifdef USE_CUDA
         FastllmCudaClearBigBuffer();
+#elifdef USE_ROCM
+        FastllmRocmClearBigBuffer();
 #endif
 //auto st = std::chrono::system_clock::now();
 #ifdef PY_API
@@ -711,6 +719,8 @@ namespace fastllm {
                                    const GenerationConfig &generationConfig) {
 #ifdef USE_CUDA
         FastllmCudaClearBigBuffer();
+#elifdef USE_ROCM
+        FastllmRocmClearBigBuffer();
 #endif
 #ifdef PY_API
         std::vector<std::string> prompts;
@@ -979,6 +989,8 @@ namespace fastllm {
                         if (seqLens.size() > 0) {
 #ifdef USE_CUDA
                             FastllmCudaClearBigBuffer();
+#elifdef USE_ROCM
+                            FastllmRocmClearBigBuffer();
 #endif
                             Data inputIds = Data(DataType::FLOAT32, {1, (int) ids.size()}, ids);
                             std::vector<int> ret = model->ForwardBatch(seqLens.size(), inputIds, attentionMasks,
