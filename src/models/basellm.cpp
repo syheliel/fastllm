@@ -9,6 +9,8 @@
 
 #ifdef USE_CUDA
 #include "fastllm-cuda.cuh"
+#elfifdef USE_ROCM
+#include "fastllm-rocm.hiph"
 #endif
 
 namespace fastllm {

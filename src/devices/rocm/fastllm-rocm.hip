@@ -9,9 +9,6 @@
 
 #include "fastllm-rocm.hiph"
 #include "fastllm.h"
-bool min(const unsigned int a, const unsigned int b){
-    return a < b ? a : b;
- }
 
 static std::map<int, hipblasHandle_t> s_fastllmCublasHandleMap;
 hipblasHandle_t getFastllmCublasHandle() {
@@ -25,7 +22,7 @@ hipblasHandle_t getFastllmCublasHandle() {
     auto stat = hipblasCreate(&handler);
 
     if (stat != HIPBLAS_STATUS_SUCCESS) {
-        printf ("CUBLAS initialization failed:%d\n", stat);
+        printf ("CUBLAS in ROCM initialization failed:%d\n", stat);
         exit(0);
     } else {
         s_fastllmCublasHandleMap[id] = handler;
@@ -1973,13 +1970,13 @@ bool FastllmRocmAttention(const fastllm::Data &q, const fastllm::Data &k, const 
 
 
         for (int i = 0; i < q0; i++) {
-            status = hipblasSgemmStridedBatched(fastllmCublasHandle,
-                                               HIPBLAS_OP_T, HIPBLAS_OP_N,
-                                               k1, q1, q2, &scale,
-                                               kd + (i / group) * k.Count(1), k.strides[1], k.Count(1),
-                                               qd + i * q.Count(1), q.strides[1], q.Count(1),
-                                               &beta,
-                                               qk, k1, k1 * q1, 1);
+            // status = hipblasSgemmStridedBatched(fastllmCublasHandle,
+            //                                    HIPBLAS_OP_T, HIPBLAS_OP_N,
+            //                                    k1, q1, q2, &scale,
+            //                                    kd + (i / group) * k.Count(1), k.strides[1], k.Count(1),
+            //                                    qd + i * q.Count(1), q.strides[1], q.Count(1),
+            //                                    &beta,
+            //                                    qk, k1, k1 * q1, 1);
             if (status != HIPBLAS_STATUS_SUCCESS) {
                 printf("status = %d\n", (int) status);
                 printf("Error: cublas error.\n");

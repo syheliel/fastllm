@@ -34,3 +34,4 @@ token
 /test/cmmlu/result/
 /models/
 .ccls-cache
+.cache/

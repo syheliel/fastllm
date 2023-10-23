@@ -14,6 +14,8 @@
 
 #ifdef USE_CUDA
 #include "fastllm-cuda.cuh"
+#elifdef USE_ROCM
+#include "fastllm-rocm.hiph"
 #endif
 
 namespace fastllm {

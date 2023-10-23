@@ -5,7 +5,7 @@
 #include "devices/cpu/cpudevice.h"
 #include "devices/rocm/rocmdevice.h"
 
-#include "fastllm-rocm.hip"
+#include "fastllm-rocm.hiph"
 #include "utils.h"
 
 namespace fastllm {
