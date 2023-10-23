@@ -14,8 +14,10 @@
 
 #ifdef USE_CUDA
 #include "fastllm-cuda.cuh"
+#define CUR_DEVICE DataDevice::CUDA
 #elifdef USE_ROCM
 #include "fastllm-rocm.hiph"
+#define CUR_DEVICE DataDevice::ROCM
 #endif
 
 namespace fastllm {
@@ -150,8 +152,8 @@ namespace fastllm {
                 pastKey.lockInCPU = true;
                 pastValue.lockInCPU = true;
             } else {
-                pastKey.ToDevice(DataDevice::CUDA);
-                pastValue.ToDevice(DataDevice::CUDA);
+                pastKey.ToDevice(CUR_DEVICE);
+                pastValue.ToDevice(CUR_DEVICE);
             }
 
             int unitLen = 64;
@@ -314,8 +316,8 @@ namespace fastllm {
                 pastKey.lockInCPU = true;
                 pastValue.lockInCPU = true;
             } else {
-                pastKey.ToDevice(DataDevice::CUDA);
-                pastValue.ToDevice(DataDevice::CUDA);
+                pastKey.ToDevice(CUR_DEVICE);
+                pastValue.ToDevice(CUR_DEVICE);
             }
 
             int unitLen = 64;
@@ -502,8 +504,8 @@ namespace fastllm {
                     pastKey.lockInCPU = true;
                     pastValue.lockInCPU = true;
                 } else {
-                    pastKey.ToDevice(DataDevice::CUDA);
-                    pastValue.ToDevice(DataDevice::CUDA);
+                    pastKey.ToDevice(CUR_DEVICE);
+                    pastValue.ToDevice(CUR_DEVICE);
                 }
                 
                 int unitLen = 64;

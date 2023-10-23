@@ -1064,7 +1064,7 @@ __global__ void FastllmAttentionBatchKernel(float** pointer, float scale, int gr
 
 void *FastllmRocmPrepareInput(const fastllm::Data &input) {
     void *ret;
-    if (input.dataDevice == fastllm::DataDevice::CUDA) {
+    if (input.dataDevice == fastllm::DataDevice::ROCM) {
         ret = (void*)input.rocmData;
     } else {
         ret = (void*)(input.expansionBytes);
@@ -1074,14 +1074,14 @@ void *FastllmRocmPrepareInput(const fastllm::Data &input) {
 }
 
 void FastllmRocmFinishInput(const fastllm::Data &input, void *data) {
-    if (input.dataDevice != fastllm::DataDevice::CUDA) {
+    if (input.dataDevice != fastllm::DataDevice::ROCM) {
         FastllmRocmFree(data);
     }
 }
 
 void *FastllmRocmPrepareOutput(fastllm::Data &output) {
     void *ret;
-    if (output.dataDevice == fastllm::DataDevice::CUDA) {
+    if (output.dataDevice == fastllm::DataDevice::ROCM) {
         ret = (float*)output.rocmData;
     } else {
         ret = (float*)FastllmRocmMalloc(output.expansionBytes);
@@ -1090,7 +1090,7 @@ void *FastllmRocmPrepareOutput(fastllm::Data &output) {
 }
 
 void FastllmRocmFinishOutput(fastllm::Data &output, void *data) {
-    if (output.dataDevice != fastllm::DataDevice::CUDA) {
+    if (output.dataDevice != fastllm::DataDevice::ROCM) {
         hipMemcpy(output.cpuData, data, output.expansionBytes, hipMemcpyDeviceToHost);
         FastllmRocmFree(data);
     }
@@ -1887,7 +1887,7 @@ bool FastllmRocmTopK(const fastllm::Data &input, fastllm::Data &output, int topk
 }
 
 bool FastllmRocmPermute(fastllm::Data &input, const std::vector<int> &axis) {
-    if (input.dataDevice != fastllm::DataDevice::CUDA) {
+    if (input.dataDevice != fastllm::DataDevice::ROCM) {
         printf("permute: data should in rocm.\n");
         exit(0);
     }

@@ -141,7 +141,7 @@ namespace fastllm {
 #ifdef USE_CUDA
             unitLen = 128;
 #elifdef USE_ROCM
-            unitLen = 128;
+            unitLen = 64;
 #endif
             while ((pastKey.dims.size() == 0 && (pastKey.expansionDims.size() == 0 || key.dims[1] > pastKey.expansionDims[1]))
                    || (pastKey.dims.size() > 0 && pastKey.dims[1] + key.dims[1] > pastKey.expansionDims[1])) {
@@ -312,7 +312,7 @@ namespace fastllm {
     #ifdef USE_CUDA
                 unitLen = 128;
     #elifdef USE_ROCM
-                unitLen = 128;
+                unitLen = 64;
     #endif
                 while ((pastKey.dims.size() == 0 && (pastKey.expansionDims.size() == 0 || key.dims[1] > pastKey.expansionDims[1]))
                     || (pastKey.dims.size() > 0 && pastKey.dims[1] + key.dims[1] > pastKey.expansionDims[1])) {

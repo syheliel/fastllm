@@ -14,7 +14,11 @@ namespace fastllm {
         AssertInFastLLM(data.cpuData != nullptr, "Copy data to " + this->deviceName + " from cpu failed: cpu's data is null.\n");
         AssertInFastLLM(data.deviceData == nullptr, "Copy data to " + this->deviceName + " from cpu failed: device's data is not null.\n");
         Malloc(&data.deviceData, data.expansionBytes);
-        bool ret = CopyDataFromCPU(data.cudaData, data.cpuData, data.expansionBytes);
+        #ifdef USE_CUDA
+            bool ret = CopyDataFromCPU(data.cudaData, data.cpuData, data.expansionBytes);
+        #elifdef USE_ROCM
+        bool ret = CopyDataFromCPU(data.rocmData, data.cpuData, data.expansionBytes);
+        #endif
         delete[] data.cpuData;
         data.cpuData = nullptr;
         return ret;

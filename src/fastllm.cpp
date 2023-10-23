@@ -379,15 +379,18 @@ namespace fastllm {
             } else {
                 this->cudaData = FastllmCudaMalloc(this->expansionBytes);
             }
-#elifdef USE_ROCM
+#else
+            ErrorInFastLLM("Error: cuda is not supported.\n");
+#endif
+        } else if (this->dataDevice == DataDevice::ROCM) {
+#ifdef USE_ROCM
             if (this->directMemory) {
                 this->rocmData = FastllmRocmDirectMalloc(this->expansionBytes);
             } else {
                 this->rocmData = FastllmRocmMalloc(this->expansionBytes);
             }
-
 #else
-            ErrorInFastLLM("Error: cuda is not supported.\n");
+            ErrorInFastLLM("Error: rocm is not supported.\n");
 #endif
         }
     }
@@ -404,14 +407,18 @@ namespace fastllm {
             } else {
                 FastllmCudaFree(this->cudaData);
             }
-#elifdef USE_ROCM
+#else
+            ErrorInFastLLM("Error: cuda is not supported.\n");
+#endif
+        } else if (this->dataDevice == DataDevice::ROCM) {
+#ifdef USE_ROCM
             if (this->directMemory) {
                 FastllmRocmDirectFree(this->rocmData);
             } else {
                 FastllmRocmFree(this->rocmData);
             }
 #else
-            ErrorInFastLLM("Error: cuda is not supported.\n");
+            ErrorInFastLLM("Error: rocm is not supported.\n");
 #endif
         }
     }
@@ -501,7 +508,11 @@ namespace fastllm {
                                             (uint8_t*)old, input1Stride * unitSize, this->dims[axis] * inner * unitSize, outer);
                 FastllmCudaFree(old);
                 FastllmCudaClearBigBuffer();
-#elifdef USE_ROCM
+#else
+                ErrorInFastLLM("Error: cuda is not supported.\n");
+#endif
+            } else if (this->dataDevice == DataDevice::ROCM) {
+#ifdef USE_ROCM
                 uint8_t *old = (uint8_t*)this->rocmData;
                 MallocSpace(this->strides[0] * std::max(this->dims[0], dims[0]));
                 int outer = this->Count(0) / this->Count(axis);
@@ -513,7 +524,7 @@ namespace fastllm {
                 FastllmRocmFree(old);
                 FastllmRocmClearBigBuffer();
 #else
-                ErrorInFastLLM("Error: cuda is not supported.\n");
+                ErrorInFastLLM("Error: rocm is not supported.\n");
 #endif
             }
         } else {
@@ -536,12 +547,7 @@ namespace fastllm {
         }
 #elifdef USE_ROCM
         if (this->rocmData != nullptr) {
-            FastllmRocmFree(this->cudaData);
-            /*if (this->directMemory) {
-                FastllmCudaDirectFree(this->cudaData);
-            } else {
-                FastllmCudaFree(this->cudaData);
-            }*/
+            FastllmRocmFree(this->rocmData);
         }
 #endif
     }
@@ -688,6 +694,9 @@ namespace fastllm {
         BaseDevice *dev = (BaseDevice*)device;
         if (dev->deviceType == "cuda") {
             this->ToDevice(DataDevice::CUDA, dev->deviceIds);
+        }
+        if (dev->deviceType == "rocm"){
+            this->ToDevice(DataDevice::ROCM, dev->deviceIds);
         } else {
             this->ToDevice(DataDevice::CPU, dev->deviceIds);
         }
@@ -696,7 +705,11 @@ namespace fastllm {
     void Data::ToDevice(fastllm::DataDevice device) {
         if (device == DataDevice::CUDA) {
             ToDevice(device, curExecutor->GetDeviceIds("cuda"));
-        } else {
+        } 
+        if (device == DataDevice::ROCM) {
+            ToDevice(device, curExecutor->GetDeviceIds("rocm"));
+        } 
+        else {
             ToDevice(device, {0});
         }
     }
@@ -768,7 +781,7 @@ namespace fastllm {
                     FastllmRocmFree(this->rocmData);
 
                     FastllmRocmSetDevice(deviceIds.size() == 0 ? 0 : deviceIds[0]);
-                    this->cudaData = FastllmRocmMalloc(expansionBytes);
+                    this->rocmData = FastllmRocmMalloc(expansionBytes);
 
                     FastllmRocmCopyFromHostToDevice(this->rocmData, cpuData, expansionBytes);
                     delete[] cpuData;

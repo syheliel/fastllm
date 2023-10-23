@@ -16,6 +16,12 @@
 
 #include <unordered_map>
 
+#ifdef USE_CUDA
+#define CUR_DEVICE DataDevice::CUDA
+#elifdef USE_ROCM
+#define CUR_DEVICE DataDevice::ROCM
+#endif
+
 namespace fastllm {
     extern double GetSpan(std::chrono::system_clock::time_point time1, std::chrono::system_clock::time_point time2);
 
@@ -122,8 +128,8 @@ namespace fastllm {
             k.ToDevice(DataDevice::CPU);
             RotatePosition2D(q, positionIds);
             RotatePosition2D(k, positionIds);
-            q.ToDevice(DataDevice::CUDA);
-            k.ToDevice(DataDevice::CUDA);
+            q.ToDevice(CUR_DEVICE);
+            k.ToDevice(CUR_DEVICE);
 
             PermuteSelf(q, {0, 2, 1, 3});
             PermuteSelf(k, {0, 2, 1, 3});
@@ -144,7 +150,7 @@ namespace fastllm {
             // 1.2.1 causal_mask
             attnWeights.ToDevice(DataDevice::CPU);
             CausalMask(attnWeights, k.dims[2] - q.dims[2]);
-            attnWeights.ToDevice(DataDevice::CUDA);
+            attnWeights.ToDevice(CUR_DEVICE);
 
             // 1.2.2 attentionMask
             // TODO: attentionMask, 这里似乎都是1, 暂且跳过了

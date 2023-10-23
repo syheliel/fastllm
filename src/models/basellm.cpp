@@ -451,8 +451,8 @@ printf("%d / %d, (%d + %d = %d)\n", b, batch, inputTokens[b].size(), generationC
                                 std::vector <int> expandDims = dims;
                                 expandDims[1] += maxOutputLimit;
 
-                                key.ToDevice(DataDevice::CUDA);
-                                value.ToDevice(DataDevice::CUDA);
+                                key.ToDevice(CUR_DEVICE);
+                                value.ToDevice(CUR_DEVICE);
                                 key.Expansion(dims);
                                 value.Expansion(dims);
                                 key.Resize(dims);

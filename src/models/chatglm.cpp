@@ -22,8 +22,10 @@
 
 #ifdef USE_CUDA
 #include "fastllm-cuda.cuh"
+#define CUR_DEVICE CUR_DEVICE
 #elifdef USE_ROCM
 #include "fastllm-rocm.hiph"
+#define CUR_DEVICE DataDevice::ROCM
 #endif
 
 namespace fastllm {
@@ -183,8 +185,8 @@ namespace fastllm {
                 pastKey.lockInCPU = true;
                 pastValue.lockInCPU = true;
             } else {
-                pastKey.ToDevice(DataDevice::CUDA);
-                pastValue.ToDevice(DataDevice::CUDA);
+                pastKey.ToDevice(CUR_DEVICE);
+                pastValue.ToDevice(CUR_DEVICE);
             };
 
             k.Resize({k.dims[0], k.dims[1] * k.dims[2], k.dims[3]});
@@ -360,8 +362,8 @@ namespace fastllm {
             const LastTokensManager &lastTokens,
             std::vector <std::vector <float>*> *retLogits) {
         int seqLen = inputIds.dims[1];
-        sinData.ToDevice(DataDevice::CUDA);
-        cosData.ToDevice(DataDevice::CUDA);
+        sinData.ToDevice(CUR_DEVICE);
+        cosData.ToDevice(CUR_DEVICE);
         int version = GetVersion();
         std::string weightPre, weightMiddle;
         if (version == 1) {
@@ -377,7 +379,7 @@ namespace fastllm {
         Embedding(inputIdsPermute, this->weight["transformer" + std::string((version == 2 ? ".embedding" : "")) +
                                                 ".word_embeddings.weight"], inputEmbeddings);
         Data &hiddenStates = inputEmbeddings;
-        hiddenStates.ToDevice(DataDevice::CUDA);
+        hiddenStates.ToDevice(CUR_DEVICE);
         Data attenInput;
         Data qkv, q, k, v;
         Data attnOutput;
@@ -513,8 +515,8 @@ namespace fastllm {
                     continue;
                 }
 
-                pastKey.ToDevice(DataDevice::CUDA);
-                pastValue.ToDevice(DataDevice::CUDA);
+                pastKey.ToDevice(CUR_DEVICE);
+                pastValue.ToDevice(CUR_DEVICE);
 
                 int unitLen = 64;
 #ifdef USE_CUDA
@@ -663,7 +665,7 @@ namespace fastllm {
                         dims[0] = total;
                         contextLayer.Expansion(dims);
                     }
-                    contextLayer.ToDevice(DataDevice::CUDA);
+                    contextLayer.ToDevice(CUR_DEVICE);
                     CatDirect(contextLayer, curContextLayer[b], 0);
                 }
             }
