@@ -22,7 +22,7 @@
 
 #ifdef USE_CUDA
 #include "fastllm-cuda.cuh"
-#elifdef USE_ROCM
+#elif defined USE_ROCM
 #include "fastllm-rocm.hiph"
 #endif
 

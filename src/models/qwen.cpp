@@ -20,7 +20,7 @@
 
 #ifdef USE_CUDA
 #include "fastllm-cuda.cuh"
-#elifdef USE_ROCM
+#elif defined USE_ROCM
 #include "fastllm-rocm.hiph"
 #endif
 
@@ -140,7 +140,7 @@ namespace fastllm {
             int unitLen = 64;
 #ifdef USE_CUDA
             unitLen = 128;
-#elifdef USE_ROCM
+#elif defined USE_ROCM
             unitLen = 64;
 #endif
             while ((pastKey.dims.size() == 0 && (pastKey.expansionDims.size() == 0 || key.dims[1] > pastKey.expansionDims[1]))
@@ -311,7 +311,7 @@ namespace fastllm {
                 int unitLen = 64;
     #ifdef USE_CUDA
                 unitLen = 128;
-    #elifdef USE_ROCM
+    #elif defined USE_ROCM
                 unitLen = 64;
     #endif
                 while ((pastKey.dims.size() == 0 && (pastKey.expansionDims.size() == 0 || key.dims[1] > pastKey.expansionDims[1]))

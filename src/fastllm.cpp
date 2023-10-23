@@ -545,7 +545,7 @@ namespace fastllm {
                 FastllmCudaFree(this->cudaData);
             }*/
         }
-#elifdef USE_ROCM
+#elif defined USE_ROCM
         if (this->rocmData != nullptr) {
             FastllmRocmFree(this->rocmData);
         }
@@ -759,7 +759,7 @@ namespace fastllm {
                     delete[] cpuData;
                 }
             }
-#elifdef USE_ROCM
+#elif defined USE_ROCM
             if (this->dataDevice == DataDevice::CPU) {
                 if (device == DataDevice::ROCM) {
                     FastllmRocmSetDevice(deviceIds.size() == 0 ? 0 : deviceIds[0]);
@@ -1811,7 +1811,7 @@ namespace fastllm {
                 FastllmCudaDirectFree(w.second.cudaData);
                 w.second.cudaData = nullptr;
             }
-#elifdef USE_ROCM
+#elif defined USE_ROCM
             if (w.second.rocmData != nullptr) {
                 FastllmRocmDirectFree(w.second.rocmData);
                 w.second.rocmData = nullptr;

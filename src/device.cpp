@@ -16,7 +16,7 @@ namespace fastllm {
         Malloc(&data.deviceData, data.expansionBytes);
         #ifdef USE_CUDA
             bool ret = CopyDataFromCPU(data.cudaData, data.cpuData, data.expansionBytes);
-        #elifdef USE_ROCM
+        #elif defined USE_ROCM
         bool ret = CopyDataFromCPU(data.rocmData, data.cpuData, data.expansionBytes);
         #endif
         delete[] data.cpuData;

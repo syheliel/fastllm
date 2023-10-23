@@ -18,7 +18,7 @@
 
 #ifdef USE_CUDA
 #define CUR_DEVICE DataDevice::CUDA
-#elifdef USE_ROCM
+#elif defined USE_ROCM
 #define CUR_DEVICE DataDevice::ROCM
 #endif
 

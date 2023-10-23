@@ -9,7 +9,7 @@
 
 #ifdef USE_CUDA
 #include "fastllm-cuda.cuh"
-#elifdef USE_ROCM
+#elif defined USE_ROCM
 #include "fastllm-rocm.hiph"
 #endif
 
@@ -60,7 +60,7 @@ namespace fastllm {
                                   const fastllm::GenerationConfig &generationConfig) {
 #ifdef USE_CUDA
         FastllmCudaClearBigBuffer();
-#elifdef USE_ROCM
+#elif defined USE_ROCM
         FastllmRocmClearBigBuffer();
 #endif
         std::string prompt = input;
@@ -146,7 +146,7 @@ namespace fastllm {
                                 RuntimeResultBatch retCb, const fastllm::GenerationConfig &generationConfig) {
 #ifdef USE_CUDA
         FastllmCudaClearBigBuffer();
-#elifdef USE_ROCM
+#elif defined USE_ROCM
         FastllmRocmClearBigBuffer();
 #endif
         
@@ -403,7 +403,7 @@ namespace fastllm {
                             model->dictLocker.unlock();
 #ifdef USE_CUDA
                             FastllmCudaClearBigBuffer();
-#elifdef USE_ROCM
+#elif defined USE_ROCM
                             FastllmRocmClearBigBuffer();
 #endif
                             int batch = (int)inputTokens.size();
@@ -638,7 +638,7 @@ printf("%d / %d\n", endingCount, batch);
                             model->dictLocker.unlock();
 #ifdef USE_CUDA
                             FastllmCudaClearBigBuffer();
-#elifdef USE_ROCM
+#elif defined USE_ROCM
                             FastllmRocmClearBigBuffer();
 #endif
                             Data inputIds = Data(DataType::FLOAT32, {1, (int) ids.size()}, ids);

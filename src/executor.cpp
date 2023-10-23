@@ -11,7 +11,7 @@
 #ifdef USE_CUDA
 #include "devices/cuda/cudadevice.h"
 #include "devices/cuda/fastllm-cuda.cuh"
-#elifdef USE_ROCM
+#elif defined USE_ROCM
 #include "devices/rocm/rocmdevice.h"
 #include "devices/rocm/fastllm-rocm.hiph"
 #endif
@@ -21,7 +21,7 @@ namespace fastllm {
         this->devices.clear();
 #ifdef USE_CUDA
         this->devices.push_back((BaseDevice*) new CudaDevice());
-#elifdef USE_ROCM
+#elif defined USE_ROCM
         this->devices.push_back((BaseDevice*) new RocmDevice());
 #endif
         this->devices.push_back((BaseDevice*) new CpuDevice());
@@ -89,7 +89,7 @@ namespace fastllm {
                 if (device->deviceType == "cuda" && device->deviceIds.size() > 0) {
                     FastllmCudaSetDevice(device->deviceIds[0]);
                 }
-#elifdef USE_ROCM
+#elif defined USE_ROCM
                 if (device->deviceType == "rocm" && device->deviceIds.size() > 0) {
                     FastllmRocmSetDevice(device->deviceIds[0]);
                 }

@@ -22,8 +22,8 @@
 
 #ifdef USE_CUDA
 #include "fastllm-cuda.cuh"
-#define CUR_DEVICE CUR_DEVICE
-#elifdef USE_ROCM
+#define CUR_DEVICE DataDevice::CUDA
+#elif defined USE_ROCM
 #include "fastllm-rocm.hiph"
 #define CUR_DEVICE DataDevice::ROCM
 #endif
@@ -198,7 +198,7 @@ namespace fastllm {
             int unitLen = 64;
 #ifdef USE_CUDA
             unitLen = 128;
-#elifdef USE_ROCM
+#elif defined USE_ROCM
             unitLen = 128;
 #endif
             while ((pastKey.dims.size() == 0 &&
@@ -521,7 +521,7 @@ namespace fastllm {
                 int unitLen = 64;
 #ifdef USE_CUDA
                 unitLen = 128;
-#elifdef USE_ROCM
+#elif defined USE_ROCM
                 unitLen = 128;
 #endif
                 while ((pastKey.dims.size() == 0 &&

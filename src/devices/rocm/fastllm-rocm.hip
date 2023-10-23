@@ -10,6 +10,10 @@
 #include "fastllm-rocm.hiph"
 #include "fastllm.h"
 
+#define DEBUG 1
+#define DEBUG_PRINT(fmt, ...) \
+        do { if (DEBUG) fprintf(stderr, "%s:%d:%s(): " fmt, __FILE__, \
+                                __LINE__, __func__, __VA_ARGS__); fprintf(stderr, "\n"); } while (0)
 static std::map<int, hipblasHandle_t> s_fastllmCublasHandleMap;
 hipblasHandle_t getFastllmCublasHandle() {
     int id = -1;
@@ -1464,6 +1468,7 @@ void * FastllmRocmDirectMalloc(size_t size) {
 }
 
 void FastllmRocmDirectFree(void *ret) {
+    DEBUG_PRINT("hipFree: %x", ret);
     hipFree(ret);
 }
 
@@ -1516,6 +1521,7 @@ void FastllmRocmFree(void *ret) {
             for (int i = 0; i < rocmBuffers.size(); i++) {
                 if (!rocmBuffers[i].busy) {
                     hipSetDevice(it.first);
+    DEBUG_PRINT("hipFree: %x", rocmBuffers[i].data);
                     hipFree(rocmBuffers[i].data);
                 } else {
                     temp.push_back(rocmBuffers[i]);
@@ -1544,6 +1550,7 @@ void FastllmRocmFree(void *ret) {
             }
         }
     }
+    DEBUG_PRINT("hipFree: %x", ret);
     hipFree(ret);
 }
 
@@ -1565,6 +1572,7 @@ void FastllmRocmClearBigBuffer() {
         for (int i = 0; i < bigBuffers.size(); i++) {
             if (!bigBuffers[i].busy) {
                 hipSetDevice(it.first);
+    DEBUG_PRINT("hipFree: %x", bigBuffers[i].data);
                 hipFree(bigBuffers[i].data);
             } else {
                 temp.push_back(bigBuffers[i]);
