@@ -1,6 +1,6 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.21)
 
-project(fastllm LANGUAGES CXX HIP)
+project(fastllm LANGUAGES CXX)
 
 option(USE_CUDA "use cuda" OFF)
 option(USE_ROCM "use rocm" OFF)
