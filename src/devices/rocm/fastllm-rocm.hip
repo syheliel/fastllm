@@ -19,7 +19,7 @@
     if (hipSuccess != (a)) { \
     fprintf(stderr, "Hip runtime error in line %s:%d \
     : %s \n", __FILE__, __LINE__, hipGetErrorString(hipGetLastError()) ); \
-    /*exit(EXIT_FAILURE);*/ \
+    exit(EXIT_FAILURE); \
     } \
     } while(0);
 
@@ -67,7 +67,7 @@ inline void gpuAssert(hipblasStatus_t code, const char *file, int line, bool abo
 
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 static std::map<int, hipblasHandle_t> s_fastllmCublasHandleMap;
-hipblasHandle_t getFastllmCublasHandle() {
+hipblasHandle_t getFastllmHipblasHandle() {
     int id = -1;
     hipGetDevice(&id);
     auto it = s_fastllmCublasHandleMap.find(id);
@@ -78,8 +78,7 @@ hipblasHandle_t getFastllmCublasHandle() {
     auto stat = hipblasCreate(&handler);
 
     if (stat != HIPBLAS_STATUS_SUCCESS) {
-        printf ("CUBLAS in ROCM initialization failed:%d\n", stat);
-        exit(0);
+        checkHipErrors(stat);
     } else {
         s_fastllmCublasHandleMap[id] = handler;
     }
@@ -1123,8 +1122,8 @@ void *FastllmRocmPrepareInput(const fastllm::Data &input) {
     if (input.dataDevice == fastllm::DataDevice::ROCM) {
         ret = (void*)input.rocmData;
     } else {
-        // ret = (void*)(input.expansionBytes); // this code is really strange
-        checkHipErrors(hipMalloc(&ret, input.expansionBytes));
+        ret = (void*)(input.expansionBytes); // this code is really strange
+        // checkHipErrors(hipMalloc(&ret, input.expansionBytes));
         checkHipErrors(hipMemcpy(ret, input.cpuData, input.expansionBytes, hipMemcpyHostToDevice));
     }
     return ret;
@@ -1190,7 +1189,7 @@ bool FastllmRocmMatMulFloatInt8(const fastllm::Data &input, fastllm::Data &weigh
     float *rocmOutput = (float*)FastllmRocmPrepareOutput(output);
 
     if (n >= 8) {
-        auto fastllmCublasHandle = getFastllmCublasHandle();
+        auto fastllmCublasHandle = getFastllmHipblasHandle();
         half *rocmFp16Input, *rocmFp16Output, *rocmFp16Weight;
         rocmFp16Input = (half *) FastllmRocmMalloc(n * m * sizeof(half));
         rocmFp16Output = (half *) FastllmRocmMalloc(n * k * sizeof(half));
@@ -1329,7 +1328,7 @@ bool FastllmRocmMatMulFloatInt4NoZero(const fastllm::Data &input, fastllm::Data 
     float *rocmOutput = (float*)FastllmRocmPrepareOutput(output);
 
     if (n >= 8) {
-        auto fastllmCublasHandle = getFastllmCublasHandle();
+        auto fastllmCublasHandle = getFastllmHipblasHandle();
         half *rocmFp16Input, *rocmFp16Output, *rocmFp16Weight;
         rocmFp16Input = (half *) FastllmRocmMalloc(n * m * sizeof(half));
         rocmFp16Output = (half *) FastllmRocmMalloc(n * k * sizeof(half));
@@ -1404,7 +1403,7 @@ bool FastllmRocmMatMulFloat32(const fastllm::Data &input, fastllm::Data &weight,
 
     if (n > 1) {
         float h_alpha = 1.0, h_beta = 0.0;
-        auto fastllmCublasHandle = getFastllmCublasHandle();
+        auto fastllmCublasHandle = getFastllmHipblasHandle();
         //rocmDeviceSynchronize();
         hipblasDatatype_t AType = HIPBLAS_R_32F, BType = HIPBLAS_R_32F, CType = HIPBLAS_R_32F, ComputeType = HIPBLAS_R_32F;
         hipblasStatus_t status;
@@ -1455,7 +1454,7 @@ bool FastllmRocmMatMulFloat16(const fastllm::Data &input, fastllm::Data &weight,
         rocmFp16Output = (half *) FastllmRocmMalloc(n * k * sizeof(half));
 
         __half h_alpha = __float2half_rn(1.0), h_beta = __float2half_rn(0.0);
-        auto fastllmCublasHandle = getFastllmCublasHandle();
+        auto fastllmCublasHandle = getFastllmHipblasHandle();
         //rocmDeviceSynchronize();
         hipblasDatatype_t AType = HIPBLAS_R_16F, BType = HIPBLAS_R_16F, CType = HIPBLAS_R_16F, ComputeType = HIPBLAS_R_16F;
         hipblasStatus_t status;
@@ -1647,7 +1646,7 @@ void FastllmRocmCopyFromDeviceToDevice(void *dst, void *src, size_t size) {
 
 void FastllmRocmMemcpy2DDeviceToDevice(void * 	dst, size_t 	dpitch, const void * 	src,
                                        size_t 	spitch, size_t 	width, size_t 	height) {
-    hipMemcpy2D(dst, dpitch, src, spitch, width, height, hipMemcpyDeviceToDevice);
+    checkHipErrors(hipMemcpy2D(dst, dpitch, src, spitch, width, height, hipMemcpyDeviceToDevice));
     //rocmDeviceSynchronize();
 }
 
@@ -2019,7 +2018,7 @@ bool FastllmRocmAttention(const fastllm::Data &q, const fastllm::Data &k, const 
     if (q1 > 1024) {
         float *qk = (float *) FastllmRocmMalloc(q1 * k1 * sizeof(float));
         float beta = 0, one = 1;
-        auto fastllmCublasHandle = getFastllmCublasHandle();
+        auto fastllmCublasHandle = getFastllmHipblasHandle();
         hipblasStatus_t status;
 
 
@@ -2073,7 +2072,7 @@ bool FastllmRocmAttention(const fastllm::Data &q, const fastllm::Data &k, const 
         float *qk = (float *) FastllmRocmMalloc(q0 * q1 * k1 * sizeof(float));
         float *temp = (float *) FastllmRocmMalloc(q0 * q1 * k1 * sizeof(float));
         float beta = 0, one = 1;
-        auto fastllmCublasHandle = getFastllmCublasHandle();
+        auto fastllmCublasHandle = getFastllmHipblasHandle();
         hipblasStatus_t status;
 
         status = hipblasSgemmStridedBatched(fastllmCublasHandle,
@@ -2131,7 +2130,7 @@ bool FastllmRocmBatchMatMul(const fastllm::Data &input0, const fastllm::Data &in
     float *rocmInput1 = (float *) FastllmRocmPrepareInput(input1);
     float *rocmOutput = (float *) FastllmRocmPrepareOutput(output);
     float beta = 0;
-    auto fastllmCublasHandle = getFastllmCublasHandle();
+    auto fastllmCublasHandle = getFastllmHipblasHandle();
     hipblasStatus_t status;
 
     status = hipblasSgemmStridedBatched(fastllmCublasHandle,
@@ -2160,7 +2159,7 @@ bool FastllmRocmBatchMatMulTransB(const fastllm::Data &input0, const fastllm::Da
     float *rocmInput1 = (float *) FastllmRocmPrepareInput(input1);
     float *rocmOutput = (float *) FastllmRocmPrepareOutput(output);
     float beta = 0;
-    auto fastllmCublasHandle = getFastllmCublasHandle();
+    auto fastllmCublasHandle = getFastllmHipblasHandle();
     hipblasStatus_t status;
 
     status = hipblasSgemmStridedBatched(fastllmCublasHandle,

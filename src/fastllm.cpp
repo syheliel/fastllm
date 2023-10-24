@@ -587,19 +587,20 @@ namespace fastllm {
         }
         printf("\n");
          */
+        
         int n = Count(0) / dims.back(), m = dims.back();
-        for (int i = 0; i < n; i++) {
-            for (int j = 0; j < 10 && j < m; j++) {
-                printf("%f ", ((float*)cpuData)[i * m + j]);
-            }
-            if (m > 10) {
-                printf("... ");
-                for (int j = 0; j < 10 && j < m; j++) {
-                    printf("%f ", ((float *) cpuData)[i * m + (m - 10 + j)]);
-                }
-            }
-            printf("\n");
-        }
+        // for (int i = 0; i < n; i++) {
+        //     for (int j = 0; j < 10 && j < m; j++) {
+        //         printf("%f ", ((float*)cpuData)[i * m + j]);
+        //     }
+        //     if (m > 10) {
+        //         printf("... ");
+        //         for (int j = 0; j < 10 && j < m; j++) {
+        //             printf("%f ", ((float *) cpuData)[i * m + (m - 10 + j)]);
+        //         }
+        //     }
+        //     printf("\n");
+        // }
     }
 
     void Data::CalcWeightSum() {
@@ -721,10 +722,6 @@ namespace fastllm {
         if (this->dataType == DataType::INT32PARAM) {
             return;
         }
-#ifndef USE_CUDA
-        // TODO: 这里先直接跳过了
-        return;
-#endif
         if (this->dataDevice == device &&
             (this->dataDevice == DataDevice::CPU || deviceIds.size() == 0 || this->dataDeviceIds == deviceIds)) {
             return;

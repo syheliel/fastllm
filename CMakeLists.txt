@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(fastllm LANGUAGES CXX)
+project(fastllm LANGUAGES CXX HIP)
 
 option(USE_CUDA "use cuda" OFF)
 option(USE_ROCM "use rocm" OFF)
@@ -17,7 +17,10 @@ message(STATUS "PYTHON_API: ${PY_API}")
 
 message(STATUS "USE_SENTENCEPIECE: ${USE_SENTENCEPIECE}")
 
-set(CMAKE_BUILD_TYPE "Release")
+set(CMAKE_BUILD_TYPE "Debug")
+set(CMAKE_CXX_COMPILER "/usr/bin/hipcc")
+set(CMAKE_CXX_FLAGS_DEBUG  "-g -O0")
+set(CMAKE_HIP_FLAGS_DEBUG  "-g -O0")
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread --std=c++17 -O2")

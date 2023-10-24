@@ -100,6 +100,7 @@ void callAttentionOp(int group=1, int attentionType=0){
 void testBase(){
     printf("testing BaseOp...\n");
     for (int i=0;i<6;i++){
+        printf("current OP is %d\n", i);
         callBaseOp(i);
     }
     printf("test BaseOp finished!\n");
