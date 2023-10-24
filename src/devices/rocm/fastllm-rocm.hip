@@ -10,10 +10,62 @@
 #include "fastllm-rocm.hiph"
 #include "fastllm.h"
 
-#define DEBUG 1
+#define DEBUG false
 #define DEBUG_PRINT(fmt, ...) \
         do { if (DEBUG) fprintf(stderr, "%s:%d:%s(): " fmt, __FILE__, \
                                 __LINE__, __func__, __VA_ARGS__); fprintf(stderr, "\n"); } while (0)
+
+#define checkHipErrors( a ) do { \
+    if (hipSuccess != (a)) { \
+    fprintf(stderr, "Hip runtime error in line %s:%d \
+    : %s \n", __FILE__, __LINE__, hipGetErrorString(hipGetLastError()) ); \
+    /*exit(EXIT_FAILURE);*/ \
+    } \
+    } while(0);
+
+inline void gpuAssert(hipblasStatus_t code, const char *file, int line, bool abort=true) 
+{
+    if (code != HIPBLAS_STATUS_SUCCESS)
+    {
+        switch (code) {
+            case HIPBLAS_STATUS_NOT_INITIALIZED:
+            fprintf(stderr, "cuBLAS Error: HIPBLAS_STATUS_NOT_INITIALIZED in %s:%d \n", file, line);
+            break; 
+            
+            case HIPBLAS_STATUS_ALLOC_FAILED:
+            fprintf(stderr, "cuBLAS Error: HIPBLAS_STATUS_ALLOC_FAILED in %s:%d \n", file, line); 
+            break; 
+
+            case HIPBLAS_STATUS_INVALID_VALUE:
+            fprintf(stderr, "cuBLAS Error: HIPBLAS_STATUS_INVALID_VALUE in %s:%d \n", file, line); 
+            break; 
+
+            case HIPBLAS_STATUS_ARCH_MISMATCH:
+            fprintf(stderr, "cuBLAS Error: HIPBLAS_STATUS_ARCH_MISMATCH in %s:%d \n", file, line); 
+            break; 
+
+            case HIPBLAS_STATUS_MAPPING_ERROR:
+            fprintf(stderr, "cuBLAS Error: HIPBLAS_STATUS_MAPPING_ERROR in %s:%d \n", file, line); 
+            break; 
+
+            case HIPBLAS_STATUS_EXECUTION_FAILED:
+            fprintf(stderr, "cuBLAS Error: HIPBLAS_STATUS_EXECUTION_FAILED in %s:%d \n", file, line); 
+            break; 
+
+            case HIPBLAS_STATUS_INTERNAL_ERROR:
+            fprintf(stderr, "cuBLAS Error: HIPBLAS_STATUS_INTERNAL_ERROR in %s:%d \n", file, line); 
+            break; 
+
+            case HIPBLAS_STATUS_NOT_SUPPORTED:
+            fprintf(stderr, "cuBLAS Error: HIPBLAS_STATUS_NOT_SUPPORTED in %s:%d \n", file, line); 
+            break; 
+
+        }
+        if (abort) exit(code);
+    }
+}
+
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 static std::map<int, hipblasHandle_t> s_fastllmCublasHandleMap;
 hipblasHandle_t getFastllmCublasHandle() {
     int id = -1;
@@ -1071,8 +1123,9 @@ void *FastllmRocmPrepareInput(const fastllm::Data &input) {
     if (input.dataDevice == fastllm::DataDevice::ROCM) {
         ret = (void*)input.rocmData;
     } else {
-        ret = (void*)(input.expansionBytes);
-        hipMemcpy(ret, input.cpuData, input.expansionBytes, hipMemcpyHostToDevice);
+        // ret = (void*)(input.expansionBytes); // this code is really strange
+        checkHipErrors(hipMalloc(&ret, input.expansionBytes));
+        checkHipErrors(hipMemcpy(ret, input.cpuData, input.expansionBytes, hipMemcpyHostToDevice));
     }
     return ret;
 }
@@ -1095,7 +1148,7 @@ void *FastllmRocmPrepareOutput(fastllm::Data &output) {
 
 void FastllmRocmFinishOutput(fastllm::Data &output, void *data) {
     if (output.dataDevice != fastllm::DataDevice::ROCM) {
-        hipMemcpy(output.cpuData, data, output.expansionBytes, hipMemcpyDeviceToHost);
+        checkHipErrors(hipMemcpy(output.cpuData, data, output.expansionBytes, hipMemcpyDeviceToHost));
         FastllmRocmFree(data);
     }
 
@@ -1105,24 +1158,24 @@ void FastllmRocmFinishOutput(fastllm::Data &output, void *data) {
 bool FastllmRocmMatMulFloatInt8(const fastllm::Data &input, fastllm::Data &weight, const fastllm::Data &bias, fastllm::Data &output, int n, int m, int k) {
     if (weight.rocmData == nullptr || weight.extraRocmData.size() == 0) {
         float *rocmScales;
-        hipMalloc(&rocmScales, k * sizeof(float));
-        hipMemcpy(rocmScales, weight.scales.data(), k * sizeof(float), hipMemcpyHostToDevice);
+        checkHipErrors(hipMalloc(&rocmScales, k * sizeof(float)));
+        checkHipErrors(hipMemcpy(rocmScales, weight.scales.data(), k * sizeof(float), hipMemcpyHostToDevice));
         weight.extraRocmData.push_back((void*)rocmScales);
 
         uint8_t *rocmZeropoints;
-        hipMalloc(&rocmZeropoints, k);
+        checkHipErrors(hipMalloc(&rocmZeropoints, k));
         uint8_t *zeropoints = new uint8_t[k];
         for (int i = 0; i < k; i++) {
             zeropoints[i] = weight.perChannelsConfigs[i].zeroPoint;
         }
-        hipMemcpy(rocmZeropoints, zeropoints, k, hipMemcpyHostToDevice);
+        checkHipErrors(hipMemcpy(rocmZeropoints, zeropoints, k, hipMemcpyHostToDevice));
         delete[] zeropoints;
         weight.extraRocmData.push_back((void*)rocmZeropoints);
 
         float *rocmBiasData;
-        hipMalloc(&rocmBiasData, k * sizeof(float));
+        checkHipErrors(hipMalloc(&rocmBiasData, k * sizeof(float)));
         if (bias.dims.size() > 0) {
-            hipMemcpy(rocmBiasData, (uint8_t*)bias.rocmData, k * sizeof(float), hipMemcpyDeviceToDevice);
+            checkHipErrors(hipMemcpy(rocmBiasData, (uint8_t*)bias.rocmData, k * sizeof(float), hipMemcpyDeviceToDevice));
         } else {
             hipMemset(rocmBiasData, 0, k * sizeof(float));
         }
@@ -1166,8 +1219,7 @@ bool FastllmRocmMatMulFloatInt8(const fastllm::Data &input, fastllm::Data &weigh
                               rocmFp16Output, CType,
                               k, ComputeType, static_cast<hipblasGemmAlgo_t>(HIPBLAS_GEMM_DEFAULT));
         if (status != HIPBLAS_STATUS_SUCCESS) {
-            printf("Error: cublas error.\n");
-            throw("cublas error");
+            gpuErrchk(status);
             exit(0);
         }
 
@@ -1197,24 +1249,24 @@ bool FastllmRocmMatMulFloatInt8(const fastllm::Data &input, fastllm::Data &weigh
 bool FastllmRocmMatMulFloatInt4(const fastllm::Data &input, fastllm::Data &weight, const fastllm::Data &bias, fastllm::Data &output, int n, int m, int k) {
     if (weight.rocmData == nullptr || weight.extraRocmData.size() == 0) {
         float *rocmScales;
-        hipMalloc(&rocmScales, k * sizeof(float));
-        hipMemcpy(rocmScales, weight.scales.data(), k * sizeof(float), hipMemcpyHostToDevice);
+        checkHipErrors(hipMalloc(&rocmScales, k * sizeof(float)));
+        checkHipErrors(hipMemcpy(rocmScales, weight.scales.data(), k * sizeof(float), hipMemcpyHostToDevice));
         weight.extraRocmData.push_back((void*)rocmScales);
 
         uint8_t *rocmZeropoints;
-        hipMalloc(&rocmZeropoints, k);
+        checkHipErrors(hipMalloc(&rocmZeropoints, k));
         uint8_t *zeropoints = new uint8_t[k];
         for (int i = 0; i < k; i++) {
             zeropoints[i] = weight.perChannelsConfigs[i].zeroPoint;
         }
-        hipMemcpy(rocmZeropoints, zeropoints, k, hipMemcpyHostToDevice);
+        checkHipErrors(hipMemcpy(rocmZeropoints, zeropoints, k, hipMemcpyHostToDevice));
         delete[] zeropoints;
         weight.extraRocmData.push_back((void*)rocmZeropoints);
 
         float *rocmBiasData;
-        hipMalloc(&rocmBiasData, k * sizeof(float));
+        checkHipErrors(hipMalloc(&rocmBiasData, k * sizeof(float)));
         if (bias.dims.size() > 0) {
-            hipMemcpy(rocmBiasData, (uint8_t*)bias.rocmData, k * sizeof(float), hipMemcpyDeviceToDevice);
+            checkHipErrors(hipMemcpy(rocmBiasData, (uint8_t*)bias.rocmData, k * sizeof(float), hipMemcpyDeviceToDevice));
         } else {
             hipMemset(rocmBiasData, 0, k * sizeof(float));
         }
@@ -1245,24 +1297,24 @@ bool FastllmRocmMatMulFloatInt4(const fastllm::Data &input, fastllm::Data &weigh
 bool FastllmRocmMatMulFloatInt4NoZero(const fastllm::Data &input, fastllm::Data &weight, const fastllm::Data &bias, fastllm::Data &output, int n, int m, int k) {
     if (weight.rocmData == nullptr || weight.extraRocmData.size() == 0) {
         float *rocmScales;
-        hipMalloc(&rocmScales, k * sizeof(float));
-        hipMemcpy(rocmScales, weight.scales.data(), k * sizeof(float), hipMemcpyHostToDevice);
+        checkHipErrors(hipMalloc(&rocmScales, k * sizeof(float)));
+        checkHipErrors(hipMemcpy(rocmScales, weight.scales.data(), k * sizeof(float), hipMemcpyHostToDevice));
         weight.extraRocmData.push_back((void*)rocmScales);
 
         float *rocmMins;
-        hipMalloc(&rocmMins, k * sizeof(float));
+        checkHipErrors(hipMalloc(&rocmMins, k * sizeof(float)));
         float *mins = new float[k];
         for (int i = 0; i < k; i++) {
             mins[i] = weight.perChannelsConfigs[i].min;
         }
-        hipMemcpy(rocmMins, mins, k * sizeof(float), hipMemcpyHostToDevice);
+        checkHipErrors(hipMemcpy(rocmMins, mins, k * sizeof(float), hipMemcpyHostToDevice));
         delete[] mins;
         weight.extraRocmData.push_back((void*)rocmMins);
 
         float *rocmBiasData;
-        hipMalloc(&rocmBiasData, k * sizeof(float));
+        checkHipErrors(hipMalloc(&rocmBiasData, k * sizeof(float)));
         if (bias.dims.size() > 0) {
-            hipMemcpy(rocmBiasData, (uint8_t*)bias.rocmData, k * sizeof(float), hipMemcpyDeviceToDevice);
+            checkHipErrors(hipMemcpy(rocmBiasData, (uint8_t*)bias.rocmData, k * sizeof(float), hipMemcpyDeviceToDevice));
         } else {
             hipMemset(rocmBiasData, 0, k * sizeof(float));
         }
@@ -1307,9 +1359,7 @@ bool FastllmRocmMatMulFloatInt4NoZero(const fastllm::Data &input, fastllm::Data 
                               rocmFp16Output, CType,
                               k, ComputeType, static_cast<hipblasGemmAlgo_t>(HIPBLAS_GEMM_DEFAULT));
         if (status != HIPBLAS_STATUS_SUCCESS) {
-            printf("Error: cublas error.\n");
-            throw("cublas error");
-            exit(0);
+            gpuErrchk(status)
         }
 
         len = n * k;
@@ -1339,9 +1389,9 @@ bool FastllmRocmMatMulFloatInt4NoZero(const fastllm::Data &input, fastllm::Data 
 bool FastllmRocmMatMulFloat32(const fastllm::Data &input, fastllm::Data &weight, const fastllm::Data &bias, fastllm::Data &output, int n, int m, int k) {
     if (weight.rocmData == nullptr || weight.extraRocmData.size() == 0) {
         float *rocmBiasData;
-        hipMalloc(&rocmBiasData, k * sizeof(float));
+        checkHipErrors(hipMalloc(&rocmBiasData, k * sizeof(float)));
         if (bias.dims.size() > 0) {
-            hipMemcpy(rocmBiasData, (uint8_t*)bias.rocmData, k * sizeof(float), hipMemcpyDeviceToDevice);
+            checkHipErrors(hipMemcpy(rocmBiasData, (uint8_t*)bias.rocmData, k * sizeof(float), hipMemcpyDeviceToDevice));
         } else {
             hipMemset(rocmBiasData, 0, k * sizeof(float));
         }
@@ -1368,8 +1418,7 @@ bool FastllmRocmMatMulFloat32(const fastllm::Data &input, fastllm::Data &weight,
                               rocmOutput, CType,
                               k, ComputeType, static_cast<hipblasGemmAlgo_t>(HIPBLAS_GEMM_DEFAULT));
         if (status != HIPBLAS_STATUS_SUCCESS) {
-            printf("Error: cublas error.\n");
-            throw("cublas error");
+            gpuErrchk(status);
             FastllmRocmFinishInput(input, rocmInput);
             FastllmRocmFinishOutput(output, rocmOutput);
             exit(0);
@@ -1388,9 +1437,9 @@ bool FastllmRocmMatMulFloat32(const fastllm::Data &input, fastllm::Data &weight,
 bool FastllmRocmMatMulFloat16(const fastllm::Data &input, fastllm::Data &weight, const fastllm::Data &bias, fastllm::Data &output, int n, int m, int k) {
     if (weight.rocmData == nullptr || weight.extraRocmData.size() == 0) {
         float *rocmBiasData;
-        hipMalloc(&rocmBiasData, k * sizeof(float));
+        checkHipErrors(hipMalloc(&rocmBiasData, k * sizeof(float)));
         if (bias.dims.size() > 0) {
-            hipMemcpy(rocmBiasData, (uint8_t*)bias.rocmData, k * sizeof(float), hipMemcpyDeviceToDevice);
+            checkHipErrors(hipMemcpy(rocmBiasData, (uint8_t*)bias.rocmData, k * sizeof(float), hipMemcpyDeviceToDevice));
         } else {
             hipMemset(rocmBiasData, 0, k * sizeof(float));
         }
@@ -1425,8 +1474,7 @@ bool FastllmRocmMatMulFloat16(const fastllm::Data &input, fastllm::Data &weight,
                               rocmFp16Output, CType,
                               k, ComputeType, static_cast<hipblasGemmAlgo_t>(HIPBLAS_GEMM_DEFAULT));
         if (status != HIPBLAS_STATUS_SUCCESS) {
-            printf("Error: cublas error.\n");
-            throw("cublas error");
+            gpuErrchk(status);
             exit(0);
         }
 
@@ -1463,13 +1511,13 @@ std::map<int, std::vector <RocmMemoryBuffer>> bigBuffersMap;
 
 void * FastllmRocmDirectMalloc(size_t size) {
     void * ret;
-    hipMalloc(&ret, size);
+    checkHipErrors(hipMalloc(&ret, size));
     return ret;
 }
 
 void FastllmRocmDirectFree(void *ret) {
     DEBUG_PRINT("hipFree: %x", ret);
-    hipFree(ret);
+    checkHipErrors(hipFree(ret));
 }
 
 void * FastllmRocmMalloc(size_t size) {
@@ -1492,7 +1540,7 @@ void * FastllmRocmMalloc(size_t size) {
         }
 
         void * ret;
-        hipMalloc(&ret, size);
+        checkHipErrors(hipMalloc(&ret, size));
         bigBuffers.push_back(RocmMemoryBuffer(ret, size, true));
         return ret;
     }
@@ -1505,7 +1553,7 @@ void * FastllmRocmMalloc(size_t size) {
         }
     }
     void * ret;
-    hipMalloc(&ret, size);
+    checkHipErrors(hipMalloc(&ret, size));
     rocmBuffers.push_back(RocmMemoryBuffer(ret, size, true));
     return ret;
 }
@@ -1522,7 +1570,7 @@ void FastllmRocmFree(void *ret) {
                 if (!rocmBuffers[i].busy) {
                     hipSetDevice(it.first);
     DEBUG_PRINT("hipFree: %x", rocmBuffers[i].data);
-                    hipFree(rocmBuffers[i].data);
+                    checkHipErrors(hipFree(rocmBuffers[i].data));
                 } else {
                     temp.push_back(rocmBuffers[i]);
                 }
@@ -1550,8 +1598,7 @@ void FastllmRocmFree(void *ret) {
             }
         }
     }
-    DEBUG_PRINT("hipFree: %x", ret);
-    hipFree(ret);
+    checkHipErrors(hipFree(ret));
 }
 
 void FastllmRocmMallocBigBuffer(size_t size) {
@@ -1559,7 +1606,7 @@ void FastllmRocmMallocBigBuffer(size_t size) {
     int id = -1;
     hipGetDevice(&id);
     auto &bigBuffers = bigBuffersMap[id];
-    hipMalloc(&ret, size);
+    checkHipErrors(hipMalloc(&ret, size));
     bigBuffers.push_back(RocmMemoryBuffer(ret, size, false));
 }
 
@@ -1572,8 +1619,7 @@ void FastllmRocmClearBigBuffer() {
         for (int i = 0; i < bigBuffers.size(); i++) {
             if (!bigBuffers[i].busy) {
                 hipSetDevice(it.first);
-    DEBUG_PRINT("hipFree: %x", bigBuffers[i].data);
-                hipFree(bigBuffers[i].data);
+                checkHipErrors(hipFree(bigBuffers[i].data));
             } else {
                 temp.push_back(bigBuffers[i]);
             }
@@ -1585,17 +1631,17 @@ void FastllmRocmClearBigBuffer() {
 }
 
 void FastllmRocmCopyFromHostToDevice(void *dst, void *src, size_t size) {
-    hipMemcpy(dst, src, size, hipMemcpyHostToDevice);
+    checkHipErrors(hipMemcpy(dst, src, size, hipMemcpyHostToDevice));
     //rocmDeviceSynchronize();
 }
 
 void FastllmRocmCopyFromDeviceToHost(void *dst, void *src, size_t size) {
-    hipMemcpy(dst, src, size, hipMemcpyDeviceToHost);
+    checkHipErrors(hipMemcpy(dst, src, size, hipMemcpyDeviceToHost));
     //rocmDeviceSynchronize();
 }
 
 void FastllmRocmCopyFromDeviceToDevice(void *dst, void *src, size_t size) {
-    hipMemcpy(dst, src, size, hipMemcpyDeviceToDevice);
+    checkHipErrors(hipMemcpy(dst, src, size, hipMemcpyDeviceToDevice));
     //rocmDeviceSynchronize();
 }
 
@@ -1635,7 +1681,7 @@ void FastllmRocmMemcpy2DDeviceToDeviceBatch(void ** 	dsts, size_t *	dpitchs, voi
             cur++;
         }
     }
-    hipMemcpy(pointers, cpuPointers, sizeof(uint8_t*) * total * 3, hipMemcpyHostToDevice);
+    checkHipErrors(hipMemcpy(pointers, cpuPointers, sizeof(uint8_t*) * total * 3, hipMemcpyHostToDevice));
     FastllmMemcpyBatchKernel <128> <<<total, 128>>> (pointers);
 
     FastllmRocmFree(pointers);
@@ -1810,7 +1856,7 @@ bool FastllmRocmSoftmaxBatch(fastllm::Data **inputs, fastllm::Data **outputs, in
         }
     }
 
-    hipMemcpy(pointers, cpuPointers, sizeof(uint8_t*) * total * 3, hipMemcpyHostToDevice);
+    checkHipErrors(hipMemcpy(pointers, cpuPointers, sizeof(uint8_t*) * total * 3, hipMemcpyHostToDevice));
     FastllmSoftmaxKernelBatchInner1 <256> <<<total, 256>>> (pointers);
 
     FastllmRocmFree(pointers);
@@ -1901,7 +1947,7 @@ bool FastllmRocmPermute(fastllm::Data &input, const std::vector<int> &axis) {
     }
     int len = input.Count(0);
     float *tempData = (float *)FastllmRocmMalloc(len * sizeof(float));
-    hipMemcpy(tempData, input.rocmData, len * sizeof(float), hipMemcpyDeviceToDevice);
+    checkHipErrors(hipMemcpy(tempData, input.rocmData, len * sizeof(float), hipMemcpyDeviceToDevice));
 
     std::vector<int> new_dims;
     for (int i = 0; i < axis.size(); i++) {
@@ -1936,7 +1982,7 @@ bool FastllmRocmPermute(fastllm::Data &input, const std::vector<int> &axis) {
         }
 
         int *rocmTemp = (int *) FastllmRocmMalloc(temp.size() * sizeof(int));
-        hipMemcpy(rocmTemp, temp.data(), temp.size() * sizeof(int), hipMemcpyHostToDevice);
+        checkHipErrors(hipMemcpy(rocmTemp, temp.data(), temp.size() * sizeof(int), hipMemcpyHostToDevice));
         int threadPerBlock = min(256, len);
         FastllmPermuteKernel <<< (len - 1) / threadPerBlock + 1, threadPerBlock >>>((float *) input.rocmData,
                                                                                     tempData, rocmTemp,
@@ -1986,9 +2032,7 @@ bool FastllmRocmAttention(const fastllm::Data &q, const fastllm::Data &k, const 
             //                                    &beta,
             //                                    qk, k1, k1 * q1, 1);
             if (status != HIPBLAS_STATUS_SUCCESS) {
-                printf("status = %d\n", (int) status);
-                printf("Error: cublas error.\n");
-                throw ("cublas error");
+                gpuErrchk(status);
                 exit(0);
             }
 
@@ -2015,9 +2059,7 @@ bool FastllmRocmAttention(const fastllm::Data &q, const fastllm::Data &k, const 
                                                &beta,
                                                od + i * v2 * q1, v2, v2 * q1, 1);
             if (status != HIPBLAS_STATUS_SUCCESS) {
-                printf("status = %d\n", (int) status);
-                printf("Error: cublas error.\n");
-                throw ("cublas error");
+                gpuErrchk(status);
                 exit(0);
             }
         }
@@ -2042,9 +2084,7 @@ bool FastllmRocmAttention(const fastllm::Data &q, const fastllm::Data &k, const 
                                            &beta,
                                            qk, k1, k1 * q1 * group, q0 / group);
         if (status != HIPBLAS_STATUS_SUCCESS) {
-            printf("status = %d\n", (int) status);
-            printf("Error: cublas error.\n");
-            throw ("cublas error");
+            gpuErrchk(status);
             exit(0);
         }
 
@@ -2072,9 +2112,7 @@ bool FastllmRocmAttention(const fastllm::Data &q, const fastllm::Data &k, const 
                                            &beta,
                                            od, v2, v2 * q1 * group, q0 / group);
         if (status != HIPBLAS_STATUS_SUCCESS) {
-            printf("status = %d\n", (int) status);
-            printf("Error: cublas error.\n");
-            throw ("cublas error");
+            gpuErrchk(status);
             exit(0);
         }
         FastllmRocmFree(qk);
@@ -2104,10 +2142,7 @@ bool FastllmRocmBatchMatMul(const fastllm::Data &input0, const fastllm::Data &in
                                        &beta,
                                        rocmOutput, k, k * n, batch);
     if (status != HIPBLAS_STATUS_SUCCESS) {
-        printf("status = %d\n", (int)status);
-        printf("%d %d %d\n", k, n, m);
-        printf("Error: cublas error.\n");
-        throw("cublas error");
+        gpuErrchk(status);
         exit(0);
     }
 
@@ -2136,10 +2171,7 @@ bool FastllmRocmBatchMatMulTransB(const fastllm::Data &input0, const fastllm::Da
                                        &beta,
                                        rocmOutput, k, k * n, batch);
     if (status != HIPBLAS_STATUS_SUCCESS) {
-        printf("status = %d\n", (int)status);
-        printf("%d %d %d\n", k, n, m);
-        printf("Error: cublas error.\n");
-        throw("cublas error");
+        gpuErrchk(status);
         exit(0);
     }
 
@@ -2259,7 +2291,7 @@ bool FastllmRocmAttentionBatch(fastllm::Data **q, fastllm::Data **k, fastllm::Da
                 cpuPointers[(b * k0 + i) * 8 + 7] = (uint8_t *) (size_t) k[b]->strides[1];
             }
         }
-        hipMemcpy(pointers, cpuPointers, sizeof(uint8_t*) * batch * k0 * 8, hipMemcpyHostToDevice);
+        checkHipErrors(hipMemcpy(pointers, cpuPointers, sizeof(uint8_t*) * batch * k0 * 8, hipMemcpyHostToDevice));
         FastllmMatMulTransBBatchKernel <128> <<<batch * k0, 128>>> (pointers, scale);
         FastllmRocmFree(pointers);
         delete[] cpuPointers;
@@ -2283,7 +2315,7 @@ bool FastllmRocmAttentionBatch(fastllm::Data **q, fastllm::Data **k, fastllm::Da
                 cur++;
             }
         }
-        hipMemcpy(pointers, cpuPointers, sizeof(uint8_t*) * total * 3, hipMemcpyHostToDevice);
+        checkHipErrors(hipMemcpy(pointers, cpuPointers, sizeof(uint8_t*) * total * 3, hipMemcpyHostToDevice));
         FastllmSoftmaxKernelBatchInner1 <256> <<<total, 256>>> (pointers);
 
         FastllmRocmFree(pointers);
@@ -2304,7 +2336,7 @@ bool FastllmRocmAttentionBatch(fastllm::Data **q, fastllm::Data **k, fastllm::Da
                 cpuPointers[(b * k0 + i) * 8 + 7] = (uint8_t *) (size_t) v[b]->strides[1];
             }
         }
-        hipMemcpy(pointers, cpuPointers, sizeof(uint8_t*) * batch * k0 * 8, hipMemcpyHostToDevice);
+        checkHipErrors(hipMemcpy(pointers, cpuPointers, sizeof(uint8_t*) * batch * k0 * 8, hipMemcpyHostToDevice));
         FastllmMatMulKernel <128> <<<batch * k0, 128>>> (pointers, 1.0f);
         FastllmRocmFree(pointers);
         delete[] cpuPointers;
@@ -2392,7 +2424,7 @@ bool FastllmRocmSplitBatch(fastllm::Data &input, fastllm::Data **outputs, int ax
     for (int i = 0; i < part; i++) {
         cpuPointers[i] = (uint8_t*)outputs[i]->rocmData;
     }
-    hipMemcpy(pointers, cpuPointers, sizeof(uint8_t*) * part, hipMemcpyHostToDevice);
+    checkHipErrors(hipMemcpy(pointers, cpuPointers, sizeof(uint8_t*) * part, hipMemcpyHostToDevice));
     FastllmSplitBatchKernel <256> <<< part * outer, 256 >>> ((uint8_t*)input.rocmData, pointers, outer, part, inner * unitSize);
 
     FastllmRocmFree(pointers);
@@ -2415,7 +2447,7 @@ bool FastllmRocmCatBatch(fastllm::Data **inputs, fastllm::Data &output, int axis
     for (int i = 0; i < part; i++) {
         cpuPointers[i] = (uint8_t*)inputs[i]->rocmData;
     }
-    hipMemcpy(pointers, cpuPointers, sizeof(uint8_t*) * part, hipMemcpyHostToDevice);
+    checkHipErrors(hipMemcpy(pointers, cpuPointers, sizeof(uint8_t*) * part, hipMemcpyHostToDevice));
     FastllmCatBatchKernel <256> <<< part * outer, 256 >>> (pointers, (uint8_t*)output.rocmData, outer, part, inner * unitSize);
 
     FastllmRocmFree(pointers);
@@ -2433,7 +2465,7 @@ bool FastllmRocmMulBatch(fastllm::Data **inputs, float v, int batch, fastllm::Da
         cpuPointers[i + batch] = (float*)outputs[i]->rocmData;
         cpuPointers[i + batch * 2] = (float*)(inputs[i]->Count(0));
     }
-    hipMemcpy(pointers, cpuPointers, sizeof(float*) * batch * 3, hipMemcpyHostToDevice);
+    checkHipErrors(hipMemcpy(pointers, cpuPointers, sizeof(float*) * batch * 3, hipMemcpyHostToDevice));
     FastllmMulBatchKernel <256> <<< batch, 256 >>> (pointers, batch, v);
 
     FastllmRocmFree(pointers);
@@ -2458,7 +2490,7 @@ bool FastllmRocmBatchMatMulTransBBatch(void **i0s, void **i1s, void **os,
         cpuPointers[i * 8 + 6] = (uint8_t *) (size_t) i0Strides[i];
         cpuPointers[i * 8 + 7] = (uint8_t *) (size_t) i1Strides[i];
     }
-    hipMemcpy(pointers, cpuPointers, sizeof(uint8_t*) * batch * 8, hipMemcpyHostToDevice);
+    checkHipErrors(hipMemcpy(pointers, cpuPointers, sizeof(uint8_t*) * batch * 8, hipMemcpyHostToDevice));
     FastllmMatMulTransBBatchKernel <128> <<<batch, 128>>> (pointers, alpha);
     FastllmRocmFree(pointers);
     delete[] cpuPointers;
@@ -2481,7 +2513,7 @@ bool FastllmRocmBatchMatMulBatch(void **i0s, void **i1s, void **os,
         cpuPointers[i * 8 + 6] = (uint8_t *) (size_t) i0Strides[i];
         cpuPointers[i * 8 + 7] = (uint8_t *) (size_t) i1Strides[i];
     }
-    hipMemcpy(pointers, cpuPointers, sizeof(uint8_t*) * batch * 8, hipMemcpyHostToDevice);
+    checkHipErrors(hipMemcpy(pointers, cpuPointers, sizeof(uint8_t*) * batch * 8, hipMemcpyHostToDevice));
     FastllmMatMulKernel <128> <<<batch, 128>>> (pointers, alpha);
     FastllmRocmFree(pointers);
     delete[] cpuPointers;
