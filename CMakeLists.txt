@@ -1,6 +1,6 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.21)
 
-project(fastllm LANGUAGES CXX HIP)
+project(fastllm LANGUAGES CXX)
 
 option(USE_CUDA "use cuda" OFF)
 option(USE_ROCM "use rocm" OFF)
@@ -17,13 +17,12 @@ message(STATUS "PYTHON_API: ${PY_API}")
 
 message(STATUS "USE_SENTENCEPIECE: ${USE_SENTENCEPIECE}")
 
-set(CMAKE_BUILD_TYPE "Debug")
-set(CMAKE_CXX_COMPILER "/usr/bin/hipcc")
-set(CMAKE_CXX_FLAGS_DEBUG  "-g -O0")
-set(CMAKE_HIP_FLAGS_DEBUG  "-g -O0")
+link_directories($ENV{CONDA_PREFIX}/lib)
+include_directories($ENV{CONDA_PREFIX}/include)
+set(CMAKE_PREFIX_PATH $ENV{CONDA_PREFIX} ${CMAKE_PREFIX_PATH})
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread --std=c++17 -O2")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread --std=c++17 -O3 -march=native")
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNOMINMAX -O2 /std:c++17 /arch:AVX /source-charset:utf-8")
 else()
@@ -68,20 +67,22 @@ endif()
 if (USE_ROCM)
     enable_language(HIP)
     add_compile_definitions(USE_ROCM)
-    set(CMAKE_HIP_COMPILER_ROCM_ROOT "/opt/rocm-5.7.1")
-    find_package(rocprim REQUIRED CONFIG PATHS "/opt/rocm/rocprim")
+    if (DEFINED $ENV{ROCM_PATH})
+        set(ROCM_PATH $ENV{ROCM_PATH})
+    else()
+        set(ROCM_PATH /opt/rocm)
+    endif()
+    set(CMAKE_HIP_COMPILER_ROCM_ROOT ${ROCM_PATH})
+    find_package(rocprim REQUIRED CONFIG PATHS ${ROCM_PATH}"/rocprim")
     find_package(HIPBLAS REQUIRED)
     include_directories(${rocprim_INCLUDE_DIRS})
     link_libraries(roc::rocprim_hip roc::hipblas)
     set(FASTLLM_CUDA_SOURCES src/devices/rocm/rocmdevice.cpp src/devices/rocm/rocmdevicebatch.cpp src/devices/rocm/fastllm-rocm.hip)
     
-set_property(GLOBAL PROPERTY POSITION_INDEPENDENT_CODE ON)
-set_property(GLOBAL PROPERTY HIP_ARCHITECTURES gfx906 gfx908 gfx90a gfx1100) # Tested on MI50, MI100, MI210, W7900
-set_property(GLOBAL PROPERTY HIP_STANDARD 17)
+    set_property(GLOBAL PROPERTY POSITION_INDEPENDENT_CODE ON)
+    set_property(GLOBAL PROPERTY HIP_ARCHITECTURES gfx906 gfx908 gfx90a gfx1100) # Tested on MI50, MI100, MI210, W7900
+    set_property(GLOBAL PROPERTY HIP_STANDARD 17)
     include_directories(include/devices/rocm)
-  link_directories($ENV{CONDA_PREFIX}/lib)
-  include_directories($ENV{CONDA_PREFIX}/include)
-  set(CMAKE_PREFIX_PATH $ENV{CONDA_PREFIX} ${CMAKE_PREFIX_PATH})
 
 endif()
 
@@ -90,7 +91,6 @@ if (PY_API)
     add_subdirectory(${PYBIND})
     add_compile_definitions(PY_API)
     
-    set(Python3_ROOT_DIR "/usr/local/python3.10.6/bin/")
     find_package(Python3 REQUIRED)
 
     include_directories(third_party/pybind11/include)
