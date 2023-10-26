@@ -54,7 +54,7 @@ class CMakeBuild(build_ext):
             f"-DPYTHON_EXECUTABLE={sys.executable}",
             f"-DCMAKE_BUILD_TYPE={cfg}",  # not used on MSVC, but no harm
             f"-DPY_API=ON",
-            f"-DUSE_CUDA=ON",
+            f"-DUSE_ROCM=ON",
         ]
         build_args = []
         # Adding CMake arguments set as environment variable
