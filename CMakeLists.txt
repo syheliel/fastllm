@@ -74,16 +74,13 @@ if (USE_ROCM)
     endif()
     set(CMAKE_HIP_COMPILER_ROCM_ROOT ${ROCM_PATH})
     find_package(rocprim REQUIRED CONFIG PATHS ${ROCM_PATH}"/rocprim")
-    find_package(HIPBLAS REQUIRED)
-    include_directories(${rocprim_INCLUDE_DIRS})
-    link_libraries(roc::rocprim_hip roc::hipblas)
+    find_package(hipblas REQUIRED)
     set(FASTLLM_CUDA_SOURCES src/devices/rocm/rocmdevice.cpp src/devices/rocm/rocmdevicebatch.cpp src/devices/rocm/fastllm-rocm.hip)
-    
+    list(APPEND FASTLLM_LINKED_LIBS roc::hipblas roc::rocprim)
     set_property(GLOBAL PROPERTY POSITION_INDEPENDENT_CODE ON)
     set_property(GLOBAL PROPERTY HIP_ARCHITECTURES gfx906 gfx908 gfx90a gfx1100) # Tested on MI50, MI100, MI210, W7900
     set_property(GLOBAL PROPERTY HIP_STANDARD 17)
     include_directories(include/devices/rocm)
-
 endif()
 
 if (PY_API)
